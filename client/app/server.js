@@ -1,4 +1,4 @@
-import {readDocument, writeDocument, addDocument, deleteDocument, getCollection} from './database.js';
+import {readDocument, writeDocument, deleteDocument, getCollection} from './database.js';
 
 /**
  * Emulates how a REST call is *asynchronous* -- it calls your function back
@@ -47,42 +47,15 @@ cb(JSON.parse(xhr.responseText));
 /**
  * Adds a new status update to the database.
  */
-export function postStatusUpdate(user, location, contents, cb) {
-  // If we were implementing this for real on an actual server, we would check
-  // that the user ID is correct & matches the authenticated user. But since
-  // we're mocking it, we can be less strict.
-
-  // Get the current UNIX time.
-  var time = new Date().getTime();
-  // The new status update. The database will assign the ID for us.
-  var newStatusUpdate = {
-    "likeCounter": [],
-    "type": "statusUpdate",
-    "contents": {
-      "author": user,
-      "postDate": time,
-      "location": location,
-      "contents": contents,
-      "likeCounter": []
-    },
-    // List of comments on the post
-    "comments": []
-  };
-
-  // Add the status update to the database.
-  // Returns the status update w/ an ID assigned.
-  newStatusUpdate = addDocument('feedItems', newStatusUpdate);
-
-  // Add the status update reference to the front of the current user's feed.
-  var userData = readDocument('users', user);
-  var feedData = readDocument('feeds', userData.feed);
-  feedData.contents.unshift(newStatusUpdate._id);
-
-  // Update the feed object.
-  writeDocument('feeds', feedData);
-
-  // Return the newly-posted object.
-  emulateServerReturn(newStatusUpdate, cb);
+  export function postStatusUpdate(user, location, contents, cb) {
+sendXHR('POST', '/feeditem', {
+userId: user,
+location: location,
+contents: contents
+}, (xhr) => {
+// Return the new status update.
+cb(JSON.parse(xhr.responseText));
+});
 }
 
 /**
@@ -227,7 +200,7 @@ export function searchForFeedItems(userId, queryText, cb) {
   );
 }
 
-var token = 'aeyJpZCI6NH0='; // <-- Put your base64'd JSON token here
+var token = 'eyJpZCI6NH0='; // <-- Put your base64'd JSON token here
 /**
 * Properly configure+send an XMLHttpRequest with error handling,
 * authorization token, and other needed properties.
