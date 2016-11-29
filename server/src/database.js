@@ -1,3 +1,4 @@
+//simply add a new line to server/src/database.js to indicate something
 // Data goes here.
 var initialData = {
   // The "user" collection. Contains all of the users in our Facebook system.
