@@ -6,6 +6,7 @@ var readDocument = require('./database').readDocument;
 var app = express();
 var database = require('./database');
 var StatusUpdateSchema = require('./schemas/statusupdate.json');
+var CommentSchema = require('./schemas/comment.json');
 var validate = require('express-jsonschema').validate;
 var writeDocument = require('./database').writeDocument;
 var addDocument = require('./database').addDocument;
@@ -133,6 +134,32 @@ writeDocument('feeds', feedData);
 // Return the newly-posted object.
 return newStatusUpdate;
 }
+
+app.post('/feeditem/:feedid/comment/contents',
+validate({ body: CommentSchema }), function(req, res) {
+  var id = parseInt(req.params.feedid, 10);
+var body = req.body;
+var fromUser = getUserIdFromToken(req.get('Authorization'));
+if(fromUser === body.author){
+  var postFeedItem = readDocument('feedItems',id);
+  postFeedItem.comments.push({
+    "author": body.author,
+    "contents": body.contents,
+    "postDate": (new Date()).getTime(),
+    "likeCounter": []
+  });
+  writeDocument('feedItems',postFeedItem);
+  res.status(201);
+  res.set('Location', '/feeditem/' + postFeedItem._id);
+  res.send(getFeedItemSync(id));
+}
+else{
+  res.status(401).end();
+}
+
+});
+
+
 // `POST /feeditem { userId: user, location: location, contents: contents }`
 app.post('/feeditem',
 validate({ body: StatusUpdateSchema }), function(req, res) {
@@ -256,6 +283,29 @@ res.status(401).end();
 }
 });
 
+//likeComment
+app.put('/feeditem/:feeditemid/comment/:commentid/likelist/:userid',function(req,res){
+  var fromUser = getUserIdFromToken(req.get('Authorization'));
+  // Convert params from string to number.
+  var feedItemId = parseInt(req.params.feeditemid, 10);
+  var userId = parseInt(req.params.userid, 10);
+  var commentid = parseInt(req.params.commentid, 10);
+
+  if (fromUser === userId) {
+    var feedItem = readDocument('feedItems',feedItemId);
+    var comment = feedItem.comments[commentid];
+    if(comment.likeCounter.indexOf(userId) === -1){
+      comment.likeCounter.push(userId);
+      writeDocument('feedItems',feedItem);
+    }
+    res.status(201);
+    comment.author= readDocument('users', comment.author);
+    res.send(comment);
+}else{
+  res.status(401).end();
+}
+});
+
 
 // Unlike a feed item.
 app.delete('/feeditem/:feeditemid/likelist/:userid', function(req, res) {
@@ -279,6 +329,28 @@ readDocument('users', userId)));
 } else {
 // 401: Unauthorized.
 res.status(401).end();
+}
+});
+
+//unlike comment
+app.delete('/feeditem/:feeditemid/comment/:commentid/likelist/:userid',function(req,res){
+  var fromUser = getUserIdFromToken(req.get('Authorization'));
+  var commentid = parseInt(req.params.commentid, 10);
+  var userId = parseInt(req.params.userid, 10);
+  var feedItemId = parseInt(req.params.feeditemid, 10);
+  if (fromUser === userId) {
+  var feedItem = readDocument('feedItems', feedItemId);
+  var comment = feedItem.comments[commentid];
+  var likeIndex = comment.likeCounter.indexOf(userId);
+  if(likeIndex !== -1){
+    comment.likeCounter.splice(likeIndex,1);
+    writeDocument('feedItems', feedItem);
+    }
+    comment.author= readDocument('users', comment.author);
+    res.status(201);
+    res.send(comment);
+}else{
+  res.status(401).end();
 }
 });
 
@@ -312,6 +384,7 @@ return feedItem.contents.contents
 res.status(400).end();
 }
 });
+
 
 // Starts the server on port 3000!
 app.listen(3000, function() {
